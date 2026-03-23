@@ -113,3 +113,29 @@ jobs:
         with:
           name: ${{ matrix.package }}-release-artifact
           path: release/*
+
+  generate-sbom:
+    needs: detect-changed-packages
+    if: needs.detect-changed-packages.outputs.matrix != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changed-packages.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve package directory
+        id: pkg
+        run: |
+          PKG_NAME="${{ matrix.package }}"
+          echo "dir=packages/${PKG_NAME##*/}" >> "$GITHUB_OUTPUT"
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: ${{ steps.pkg.outputs.dir }}
+          format: spdx-json
+          output-file: ${{ steps.pkg.outputs.dir }}-sbom.spdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package }}-sbom
+          path: ${{ steps.pkg.outputs.dir }}-sbom.spdx.json
